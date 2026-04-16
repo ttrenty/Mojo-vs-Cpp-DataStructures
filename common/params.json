@@ -1,0 +1,16 @@
+{
+  "blocked_bloom": {
+    "n_keys": [100000, 250000, 500000, 1000000, 2500000, 5000000],
+    "bits_per_key": [6, 8, 10, 12, 14, 16],
+    "query_modes": ["negative", "mixed"]
+  },
+  "quotient_filter": {
+    "q": [16, 18, 20],
+    "remainder_bits": [8, 10, 12, 14, 16],
+    "target_load_factor": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85]
+  },
+  "elias_fano": {
+    "n": [100000, 250000, 500000, 1000000, 2500000, 5000000],
+    "density": ["dense", "medium", "sparse"]
+  }
+}

@@ -1,0 +1,67 @@
+name: Deploy implementation comparison report
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/deploy-implementation-compare-pages.yml"
+      - "common/compare_implementations.py"
+      - "common/implementation_compare_spec.json"
+      - "cpp/**"
+      - "mojo/**"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate comparison report
+        run: python common/compare_implementations.py
+
+      - name: Stage Pages site
+        run: |
+          mkdir -p site
+          cp results/processed/implementation_compare.html site/index.html
+          cp results/processed/implementation_compare.html site/implementation_compare.html
+          cp results/processed/implementation_compare.json site/implementation_compare.json
+          cp results/processed/implementation_compare.md site/implementation_compare.md
+          touch site/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

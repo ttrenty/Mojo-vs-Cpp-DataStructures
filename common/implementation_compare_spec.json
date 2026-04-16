@@ -1,0 +1,208 @@
+{
+  "modules": [
+    {
+      "name": "hash",
+      "cpp_path": "cpp/include/hash.hpp",
+      "mojo_path": "mojo/src/db_structures/hash.mojo",
+      "notes": [
+        "The generated hash constants are intentionally excluded here; this report compares the hand-written helper logic only."
+      ],
+      "representation_differences": [],
+      "pairs": [
+        {"canonical": "splitmix64", "kind": "function", "cpp": "splitmix64", "mojo": "splitmix64"},
+        {"canonical": "hash_uint64", "kind": "function", "cpp": "hash_uint64", "mojo": "hash_uint64"},
+        {"canonical": "recommended_k_hashes", "kind": "function", "cpp": "recommended_k_hashes", "mojo": "recommended_k_hashes"},
+        {"canonical": "dataset_key", "kind": "function", "cpp": "dataset_key", "mojo": "dataset_key"},
+        {"canonical": "negative_query", "kind": "function", "cpp": "negative_query", "mojo": "negative_query"}
+      ],
+      "allowed_cpp_only_functions": [],
+      "allowed_mojo_only_functions": [],
+      "disallowed_cpp_symbols": [],
+      "disallowed_mojo_symbols": []
+    },
+    {
+      "name": "benchmark_utils",
+      "cpp_path": "cpp/include/benchmark_utils.hpp",
+      "mojo_path": "mojo/src/db_structures/benchmark_utils.mojo",
+      "notes": [
+        "This module mixes shared deterministic workload helpers with language-specific benchmarking support."
+      ],
+      "representation_differences": [
+        "C++ keeps platform-specific benchmark helpers such as CPU pinning and compiler-version reporting in this file.",
+        "Mojo keeps ns_per_op in this file even though the C++ harness computes ns/op inline."
+      ],
+      "pairs": [
+        {"canonical": "make_deterministic_keys", "kind": "function", "cpp": "make_deterministic_keys", "mojo": "make_deterministic_keys"},
+        {"canonical": "default_positive_keys", "kind": "function", "cpp": "default_positive_keys", "mojo": "default_positive_keys"},
+        {"canonical": "default_negative_queries", "kind": "function", "cpp": "default_negative_queries", "mojo": "default_negative_queries"},
+        {"canonical": "make_mixed_queries", "kind": "function", "cpp": "make_mixed_queries", "mojo": "make_mixed_queries"},
+        {"canonical": "make_sorted_unique_values", "kind": "function", "cpp": "make_sorted_unique_values", "mojo": "make_sorted_unique_values"},
+        {"canonical": "density_label", "kind": "function", "cpp": "density_label", "mojo": "density_label"}
+      ],
+      "allowed_cpp_only_functions": [
+        "measure_ns",
+        "summarize",
+        "do_not_optimize",
+        "do_not_optimize_u64",
+        "pin_process_to_core",
+        "compiler_version_string",
+        "env_or_default"
+      ],
+      "allowed_mojo_only_functions": ["ns_per_op"],
+      "disallowed_cpp_symbols": [],
+      "disallowed_mojo_symbols": []
+    },
+    {
+      "name": "blocked_bloom",
+      "cpp_path": "cpp/include/blocked_bloom.hpp",
+      "mojo_path": "mojo/src/db_structures/blocked_bloom.mojo",
+      "notes": [
+        "The compared helpers intentionally stop short of the representation details; the C++ file exposes explicit cache-line blocks while Mojo keeps a flat word array."
+      ],
+      "representation_differences": [
+        "C++ stores aligned 64-byte Block objects and exposes raw_blocks for layout inspection.",
+        "Mojo stores a flat List[UInt64] and keeps block_base as a layout convenience helper."
+      ],
+      "pairs": [
+        {"canonical": "build", "kind": "function", "cpp": "build", "mojo": "build"},
+        {"canonical": "insert", "kind": "function", "cpp": "insert", "mojo": "insert"},
+        {"canonical": "contains", "kind": "function", "cpp": "contains", "mojo": "contains"},
+        {"canonical": "memory_bytes", "kind": "function", "cpp": "memory_bytes", "mojo": "memory_bytes"},
+        {"canonical": "debug_block_words", "kind": "function", "cpp": "debug_block_words", "mojo": "debug_block_words"},
+        {"canonical": "block_index", "kind": "function", "cpp": "block_index", "mojo": "block_index"},
+        {"canonical": "probe_position", "kind": "function", "cpp": "probe_position", "mojo": "probe_position"},
+        {"canonical": "empirical_false_positive_rate", "kind": "function", "cpp": "empirical_false_positive_rate", "mojo": "empirical_false_positive_rate"}
+      ],
+      "allowed_cpp_only_functions": [
+        "BlockedBloomFilter",
+        "num_blocks",
+        "bits_per_key",
+        "k_hashes",
+        "raw_blocks"
+      ],
+      "allowed_mojo_only_functions": ["__init__", "block_base", "build_blocked_bloom"],
+      "disallowed_cpp_symbols": [],
+      "disallowed_mojo_symbols": []
+    },
+    {
+      "name": "quotient_filter",
+      "cpp_path": "cpp/include/quotient_filter.hpp",
+      "mojo_path": "mojo/src/db_structures/quotient_filter.mojo",
+      "notes": [
+        "The helper-order contract begins at split_fingerprint and continues through record_insert_stats.",
+        "Type definitions for Fingerprint, Entry, and Instrumentation are compared visually but do not participate in order enforcement."
+      ],
+      "representation_differences": [],
+      "pairs": [
+        {"canonical": "Fingerprint", "kind": "type", "cpp": "Fingerprint", "mojo": "Fingerprint", "enforce_order": false},
+        {"canonical": "Entry", "kind": "type", "cpp": "Entry", "mojo": "Entry", "enforce_order": false},
+        {"canonical": "Instrumentation", "kind": "type", "cpp": "Instrumentation", "mojo": "Instrumentation", "enforce_order": false},
+        {"canonical": "create", "kind": "function", "cpp": "create", "mojo": "create"},
+        {"canonical": "insert", "kind": "function", "cpp": "insert", "mojo": "insert"},
+        {"canonical": "contains", "kind": "function", "cpp": "contains", "mojo": "contains"},
+        {"canonical": "erase", "kind": "function", "cpp": "erase", "mojo": "erase"},
+        {"canonical": "load_factor", "kind": "function", "cpp": "load_factor", "mojo": "load_factor"},
+        {"canonical": "memory_bytes", "kind": "function", "cpp": "memory_bytes", "mojo": "memory_bytes"},
+        {"canonical": "average_probe_distance", "kind": "function", "cpp": "average_probe_distance", "mojo": "average_probe_distance"},
+        {"canonical": "average_cluster_length", "kind": "function", "cpp": "average_cluster_length", "mojo": "average_cluster_length"},
+        {"canonical": "max_probe_distance", "kind": "function", "cpp": "max_probe_distance", "mojo": "max_probe_distance"},
+        {"canonical": "max_cluster_length", "kind": "function", "cpp": "max_cluster_length", "mojo": "max_cluster_length"},
+        {"canonical": "instrumentation", "kind": "function", "cpp": "instrumentation", "mojo": "instrumentation"},
+        {"canonical": "raw_slots", "kind": "function", "cpp": "raw_slots", "mojo": "raw_slots"},
+        {"canonical": "split_fingerprint", "kind": "function", "cpp": "split_fingerprint", "mojo": "split_fingerprint"},
+        {"canonical": "advance", "kind": "function", "cpp": "advance", "mojo": "advance"},
+        {"canonical": "decrement", "kind": "function", "cpp": "decrement", "mojo": "decrement"},
+        {"canonical": "increment", "kind": "function", "cpp": "increment", "mojo": "increment"},
+        {"canonical": "distance", "kind": "function", "cpp": "distance", "mojo": "distance"},
+        {"canonical": "slot_empty", "kind": "function", "cpp": "slot_empty", "mojo": "slot_empty"},
+        {"canonical": "occupied", "kind": "function", "cpp": "occupied", "mojo": "occupied"},
+        {"canonical": "continuation", "kind": "function", "cpp": "continuation", "mojo": "continuation"},
+        {"canonical": "shifted", "kind": "function", "cpp": "shifted", "mojo": "shifted"},
+        {"canonical": "remainder", "kind": "function", "cpp": "remainder", "mojo": "remainder"},
+        {"canonical": "make_slot", "kind": "function", "cpp": "make_slot", "mojo": "make_slot"},
+        {"canonical": "next_occupied", "kind": "function", "cpp": "next_occupied", "mojo": "next_occupied"},
+        {"canonical": "find_cluster_start", "kind": "function", "cpp": "find_cluster_start", "mojo": "find_cluster_start"},
+        {"canonical": "find_run_start", "kind": "function", "cpp": "find_run_start", "mojo": "find_run_start"},
+        {"canonical": "contains_fingerprint", "kind": "function", "cpp": "contains_fingerprint", "mojo": "contains_fingerprint"},
+        {"canonical": "materialize_cluster", "kind": "function", "cpp": "materialize_cluster", "mojo": "materialize_cluster"},
+        {"canonical": "find_insert_position", "kind": "function", "cpp": "find_insert_position", "mojo": "find_insert_position"},
+        {"canonical": "rewrite_cluster", "kind": "function", "cpp": "rewrite_cluster", "mojo": "rewrite_cluster"},
+        {"canonical": "record_insert_stats", "kind": "function", "cpp": "record_insert_stats", "mojo": "record_insert_stats"}
+      ],
+      "allowed_cpp_only_functions": ["QuotientFilter", "size", "capacity", "remainder_bits"],
+      "allowed_mojo_only_functions": ["__init__", "create_quotient_filter"],
+      "disallowed_cpp_symbols": [],
+      "disallowed_mojo_symbols": [
+        "QfEntry",
+        "QuotientInstrumentation",
+        "instrumentation_snapshot",
+        "slot_remainder"
+      ]
+    },
+    {
+      "name": "elias_fano",
+      "cpp_path": "cpp/include/elias_fano.hpp",
+      "mojo_path": "mojo/src/db_structures/elias_fano.mojo",
+      "notes": [
+        "Mojo keeps tiny UInt64 bit-wrapper helpers for parity with std.bit operations; they are allowed extras, not logic drift."
+      ],
+      "representation_differences": [],
+      "pairs": [
+        {"canonical": "build", "kind": "function", "cpp": "build", "mojo": "build"},
+        {"canonical": "contains", "kind": "function", "cpp": "contains", "mojo": "contains"},
+        {"canonical": "select", "kind": "function", "cpp": "select", "mojo": "select"},
+        {"canonical": "predecessor", "kind": "function", "cpp": "predecessor", "mojo": "predecessor"},
+        {"canonical": "memory_bytes", "kind": "function", "cpp": "memory_bytes", "mojo": "memory_bytes"},
+        {"canonical": "lower_words", "kind": "function", "cpp": "lower_words", "mojo": "lower_words"},
+        {"canonical": "upper_words", "kind": "function", "cpp": "upper_words", "mojo": "upper_words"},
+        {"canonical": "write_lower", "kind": "function", "cpp": "write_lower", "mojo": "write_lower"},
+        {"canonical": "read_lower", "kind": "function", "cpp": "read_lower", "mojo": "read_lower"}
+      ],
+      "allowed_cpp_only_functions": ["EliasFano", "size", "lower_bits", "universe_max"],
+      "allowed_mojo_only_functions": ["__init__", "pop_count_u64", "count_trailing_zeros_u64"],
+      "disallowed_cpp_symbols": [],
+      "disallowed_mojo_symbols": ["raw_lower_words", "raw_upper_words"]
+    },
+    {
+      "name": "hash_cli",
+      "cpp_path": "cpp/tools/hash_cli.cpp",
+      "mojo_path": "mojo/hash_cli.mojo",
+      "notes": [],
+      "representation_differences": [],
+      "pairs": [
+        {"canonical": "print_usage", "kind": "function", "cpp": "print_usage", "mojo": "print_usage"},
+        {"canonical": "main", "kind": "function", "cpp": "main", "mojo": "main"}
+      ],
+      "allowed_cpp_only_functions": [],
+      "allowed_mojo_only_functions": [],
+      "disallowed_cpp_symbols": [],
+      "disallowed_mojo_symbols": []
+    },
+    {
+      "name": "structure_parity",
+      "cpp_path": "cpp/tools/structure_parity.cpp",
+      "mojo_path": "mojo/structure_parity.mojo",
+      "notes": [
+        "This module is intentionally verbose because it exports fixed-fixture payloads for cross-language parity checks."
+      ],
+      "representation_differences": [],
+      "pairs": [
+        {"canonical": "emit_text", "kind": "function", "cpp": "emit_text", "mojo": "emit_text"},
+        {"canonical": "emit_int", "kind": "function", "cpp": "emit_int", "mojo": "emit_int"},
+        {"canonical": "emit_u64", "kind": "function", "cpp": "emit_u64", "mojo": "emit_u64"},
+        {"canonical": "emit_u32", "kind": "function", "cpp": "emit_u32", "mojo": "emit_u32"},
+        {"canonical": "emit_bool", "kind": "function", "cpp": "emit_bool", "mojo": "emit_bool"},
+        {"canonical": "emit_optional_u64", "kind": "function", "cpp": "emit_optional_u64", "mojo": "emit_optional_u64"},
+        {"canonical": "print_usage", "kind": "function", "cpp": "print_usage", "mojo": "print_usage"},
+        {"canonical": "emit_blocked_bloom_parity", "kind": "function", "cpp": "emit_blocked_bloom_parity", "mojo": "emit_blocked_bloom_parity"},
+        {"canonical": "emit_quotient_filter_parity", "kind": "function", "cpp": "emit_quotient_filter_parity", "mojo": "emit_quotient_filter_parity"},
+        {"canonical": "emit_elias_fano_parity", "kind": "function", "cpp": "emit_elias_fano_parity", "mojo": "emit_elias_fano_parity"},
+        {"canonical": "main", "kind": "function", "cpp": "main", "mojo": "main"}
+      ],
+      "allowed_cpp_only_functions": [],
+      "allowed_mojo_only_functions": [],
+      "disallowed_cpp_symbols": [],
+      "disallowed_mojo_symbols": []
+    }
+  ]
+}

@@ -1,0 +1,575 @@
+[workspace]
+authors = ["Thomas Trenty"]
+channels = ["https://conda.modular.com/max-nightly", "conda-forge"]
+name = "CS2525 C++ vs. Mojo"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks._generate_hash_assets]
+cmd = "python common/generate_hash_assets.py"
+inputs = [
+    "common/hash_reference.py",
+    "common/hash_spec.py",
+    "common/hash_spec.json",
+    "common/generate_hash_assets.py",
+]
+outputs = [
+    "build/generated/cpp/hash_constants.hpp",
+    "build/generated/hash_golden.json",
+    "build/generated/mojo/shared/__init__.mojo",
+    "build/generated/mojo/shared/hash_constants.mojo",
+]
+
+[tasks._build_cpp]
+cmd = """
+bash -lc '
+cmake -S cpp -B build/cpp \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_CXX_COMPILER=${CXX:-clang++} &&
+cmake --build build/cpp --parallel
+'
+"""
+inputs = [
+    "cpp/CMakeLists.txt",
+    "common/hash_reference.py",
+    "common/hash_spec.py",
+    "common/hash_spec.json",
+    "common/generate_hash_assets.py",
+    "cpp/include/**/*.hpp",
+    "cpp/benches/**/*.cpp",
+    "cpp/tools/**/*.cpp",
+    "cpp/tests/**/*.cpp",
+]
+outputs = [
+    "build/cpp/cpp_tests",
+    "build/cpp/cpp_bench",
+    "build/cpp/cpp_hash",
+    "build/cpp/cpp_structure_parity",
+]
+
+[tasks._test_cpp]
+cmd = "./build/cpp/cpp_tests"
+depends-on = ["_build_cpp"]
+
+[tasks._test_mojo]
+cmd = "mojo run -I mojo/src -I build/generated/mojo mojo/tests/test_main.mojo"
+depends-on = ["_generate_hash_assets"]
+inputs = [
+    "build/generated/mojo/shared/__init__.mojo",
+    "build/generated/mojo/shared/hash_constants.mojo",
+    "mojo/src/**/*.mojo",
+    "mojo/tests/**/*.mojo",
+]
+
+[tasks._build_mojo_hash]
+cmd = """
+bash -lc '
+mkdir -p build/mojo &&
+mojo build -I mojo/src -I build/generated/mojo mojo/hash_cli.mojo -o build/mojo/mojo_hash
+'
+"""
+depends-on = ["_generate_hash_assets"]
+inputs = [
+    "build/generated/mojo/shared/__init__.mojo",
+    "build/generated/mojo/shared/hash_constants.mojo",
+    "mojo/hash_cli.mojo",
+    "mojo/src/**/*.mojo",
+]
+outputs = ["build/mojo/mojo_hash"]
+
+[tasks._build_mojo_structure_parity]
+cmd = """
+bash -lc '
+mkdir -p build/mojo &&
+mojo build -I mojo/src -I build/generated/mojo mojo/structure_parity.mojo -o build/mojo/mojo_structure_parity
+'
+"""
+depends-on = ["_generate_hash_assets"]
+inputs = [
+    "build/generated/mojo/shared/__init__.mojo",
+    "build/generated/mojo/shared/hash_constants.mojo",
+    "mojo/structure_parity.mojo",
+    "mojo/src/**/*.mojo",
+]
+outputs = ["build/mojo/mojo_structure_parity"]
+
+[tasks._build_mojo_bench]
+cmd = """
+bash -lc '
+mkdir -p build/mojo &&
+mojo build -I mojo/src -I build/generated/mojo mojo/bench_main.mojo -o build/mojo/mojo_bench
+'
+"""
+depends-on = ["_generate_hash_assets"]
+inputs = [
+    "build/generated/mojo/shared/__init__.mojo",
+    "build/generated/mojo/shared/hash_constants.mojo",
+    "mojo/bench_main.mojo",
+    "mojo/src/**/*.mojo",
+]
+outputs = ["build/mojo/mojo_bench"]
+
+[tasks._test_hash_conformance]
+cmd = "python common/verify_hash_conformance.py"
+depends-on = ["_generate_hash_assets", "_build_cpp", "_build_mojo_hash"]
+inputs = [
+    "build/generated/hash_golden.json",
+    "common/verify_hash_conformance.py",
+    "build/cpp/cpp_hash",
+    "build/mojo/mojo_hash",
+]
+
+[tasks._test_structure_parity]
+cmd = "python common/verify_structure_parity.py"
+depends-on = ["_build_cpp", "_build_mojo_structure_parity"]
+inputs = [
+    "common/verify_structure_parity.py",
+    "build/cpp/cpp_structure_parity",
+    "build/mojo/mojo_structure_parity",
+]
+
+[tasks.tests]
+depends-on = [
+    "_generate_hash_assets",
+    "_test_hash_conformance",
+    "_test_structure_parity",
+    "_test_cpp",
+    "_test_mojo",
+]
+
+[tasks._bench_blocked_bloom_cpp_smoke]
+cmd = """
+bash -lc '
+mkdir -p results/raw/smoke &&
+if command -v taskset >/dev/null 2>&1; then
+  taskset -c 0 ./build/cpp/cpp_bench blocked_bloom --n 100000 --bits-per-key 10 --runs 5 --warmup-runs 1 --query-mode negative > results/raw/smoke/blocked_bloom_cpp_smoke.csv
+else
+  ./build/cpp/cpp_bench blocked_bloom --n 100000 --bits-per-key 10 --runs 5 --warmup-runs 1 --query-mode negative > results/raw/smoke/blocked_bloom_cpp_smoke.csv
+fi
+'
+"""
+depends-on = ["_build_cpp"]
+inputs = ["build/cpp/cpp_bench"]
+outputs = ["results/raw/smoke/blocked_bloom_cpp_smoke.csv"]
+
+[tasks._bench_blocked_bloom_mojo_smoke]
+cmd = """
+bash -lc '
+mkdir -p results/raw/smoke &&
+if command -v taskset >/dev/null 2>&1; then
+  taskset -c 0 ./build/mojo/mojo_bench blocked_bloom --n 100000 --bits-per-key 10 --runs 5 --warmup-runs 1 --query-mode negative > results/raw/smoke/blocked_bloom_mojo_smoke.csv
+else
+  ./build/mojo/mojo_bench blocked_bloom --n 100000 --bits-per-key 10 --runs 5 --warmup-runs 1 --query-mode negative > results/raw/smoke/blocked_bloom_mojo_smoke.csv
+fi
+'
+"""
+depends-on = ["_build_mojo_bench"]
+inputs = ["build/mojo/mojo_bench"]
+outputs = ["results/raw/smoke/blocked_bloom_mojo_smoke.csv"]
+
+[tasks._bench_quotient_filter_cpp_smoke]
+cmd = """
+bash -lc '
+mkdir -p results/raw/smoke &&
+if command -v taskset >/dev/null 2>&1; then
+  taskset -c 0 ./build/cpp/cpp_bench quotient_filter --q 12 --remainder-bits 10 --target-load 0.7 --runs 5 --warmup-runs 1 --workload read_heavy --op-count 5000 > results/raw/smoke/quotient_filter_cpp_smoke.csv
+else
+  ./build/cpp/cpp_bench quotient_filter --q 12 --remainder-bits 10 --target-load 0.7 --runs 5 --warmup-runs 1 --workload read_heavy --op-count 5000 > results/raw/smoke/quotient_filter_cpp_smoke.csv
+fi
+'
+"""
+depends-on = ["_build_cpp"]
+inputs = ["build/cpp/cpp_bench"]
+outputs = ["results/raw/smoke/quotient_filter_cpp_smoke.csv"]
+
+[tasks._bench_quotient_filter_mojo_smoke]
+cmd = """
+bash -lc '
+mkdir -p results/raw/smoke &&
+if command -v taskset >/dev/null 2>&1; then
+  taskset -c 0 ./build/mojo/mojo_bench quotient_filter --q 12 --remainder-bits 10 --target-load 0.7 --runs 5 --warmup-runs 1 --workload read_heavy --op-count 5000 > results/raw/smoke/quotient_filter_mojo_smoke.csv
+else
+  ./build/mojo/mojo_bench quotient_filter --q 12 --remainder-bits 10 --target-load 0.7 --runs 5 --warmup-runs 1 --workload read_heavy --op-count 5000 > results/raw/smoke/quotient_filter_mojo_smoke.csv
+fi
+'
+"""
+depends-on = ["_build_mojo_bench"]
+inputs = ["build/mojo/mojo_bench"]
+outputs = ["results/raw/smoke/quotient_filter_mojo_smoke.csv"]
+
+[tasks._bench_elias_fano_cpp_smoke]
+cmd = """
+bash -lc '
+mkdir -p results/raw/smoke &&
+if command -v taskset >/dev/null 2>&1; then
+  taskset -c 0 ./build/cpp/cpp_bench elias_fano --n 5000 --universe-factor 64 --runs 5 --warmup-runs 1 --workload predecessor --op-count 5000 > results/raw/smoke/elias_fano_cpp_smoke.csv
+else
+  ./build/cpp/cpp_bench elias_fano --n 5000 --universe-factor 64 --runs 5 --warmup-runs 1 --workload predecessor --op-count 5000 > results/raw/smoke/elias_fano_cpp_smoke.csv
+fi
+'
+"""
+depends-on = ["_build_cpp"]
+inputs = ["build/cpp/cpp_bench"]
+outputs = ["results/raw/smoke/elias_fano_cpp_smoke.csv"]
+
+[tasks._bench_elias_fano_mojo_smoke]
+cmd = """
+bash -lc '
+mkdir -p results/raw/smoke &&
+if command -v taskset >/dev/null 2>&1; then
+  taskset -c 0 ./build/mojo/mojo_bench elias_fano --n 5000 --universe-factor 64 --runs 5 --warmup-runs 1 --workload predecessor --op-count 5000 > results/raw/smoke/elias_fano_mojo_smoke.csv
+else
+  ./build/mojo/mojo_bench elias_fano --n 5000 --universe-factor 64 --runs 5 --warmup-runs 1 --workload predecessor --op-count 5000 > results/raw/smoke/elias_fano_mojo_smoke.csv
+fi
+'
+"""
+depends-on = ["_build_mojo_bench"]
+inputs = ["build/mojo/mojo_bench"]
+outputs = ["results/raw/smoke/elias_fano_mojo_smoke.csv"]
+
+[tasks.bench_tests]
+depends-on = [
+    "_bench_blocked_bloom_cpp_smoke",
+    "_bench_blocked_bloom_mojo_smoke",
+    "_bench_quotient_filter_cpp_smoke",
+    "_bench_quotient_filter_mojo_smoke",
+    "_bench_elias_fano_cpp_smoke",
+    "_bench_elias_fano_mojo_smoke",
+]
+
+[tasks.bench_representative]
+cmd = "python common/run_benchmarks.py --profile representative"
+inputs = [
+    "common/run_benchmarks.py",
+    "common/params.json",
+    "common/hash_reference.py",
+    "common/hash_spec.py",
+    "common/hash_spec.json",
+    "common/generate_hash_assets.py",
+    "common/analysis/collect_build_metrics.py",
+    "cpp/CMakeLists.txt",
+    "cpp/include/**/*.hpp",
+    "cpp/benches/**/*.cpp",
+    "mojo/bench_main.mojo",
+    "mojo/src/**/*.mojo",
+]
+outputs = [
+    "results/raw/representative/representative_blocked_bloom_cpp.csv",
+    "results/raw/representative/representative_blocked_bloom_mojo.csv",
+    "results/raw/representative/representative_quotient_filter_cpp.csv",
+    "results/raw/representative/representative_quotient_filter_mojo.csv",
+    "results/raw/representative/representative_elias_fano_cpp.csv",
+    "results/raw/representative/representative_elias_fano_mojo.csv",
+]
+
+[tasks.bench_representative_parallel]
+cmd = "python common/run_benchmarks.py --profile representative --parallel-workers 0 --reserve-cores 4 --output-dir-name representative_parallel"
+inputs = [
+    "common/run_benchmarks.py",
+    "common/params.json",
+    "common/hash_reference.py",
+    "common/hash_spec.py",
+    "common/hash_spec.json",
+    "common/generate_hash_assets.py",
+    "common/analysis/collect_build_metrics.py",
+    "cpp/CMakeLists.txt",
+    "cpp/include/**/*.hpp",
+    "cpp/benches/**/*.cpp",
+    "mojo/bench_main.mojo",
+    "mojo/src/**/*.mojo",
+]
+outputs = [
+    "results/raw/representative_parallel/representative_blocked_bloom_cpp.csv",
+    "results/raw/representative_parallel/representative_blocked_bloom_mojo.csv",
+    "results/raw/representative_parallel/representative_quotient_filter_cpp.csv",
+    "results/raw/representative_parallel/representative_quotient_filter_mojo.csv",
+    "results/raw/representative_parallel/representative_elias_fano_cpp.csv",
+    "results/raw/representative_parallel/representative_elias_fano_mojo.csv",
+]
+
+[tasks.bench_report]
+depends-on = ["bench_representative"]
+
+[tasks.bench_full]
+cmd = "python common/run_benchmarks.py --profile full"
+inputs = [
+    "common/run_benchmarks.py",
+    "common/params.json",
+    "common/hash_reference.py",
+    "common/hash_spec.py",
+    "common/hash_spec.json",
+    "common/generate_hash_assets.py",
+    "common/analysis/collect_build_metrics.py",
+    "cpp/CMakeLists.txt",
+    "cpp/include/**/*.hpp",
+    "cpp/benches/**/*.cpp",
+    "mojo/bench_main.mojo",
+    "mojo/src/**/*.mojo",
+]
+outputs = [
+    "results/raw/full/full_blocked_bloom_cpp.csv",
+    "results/raw/full/full_blocked_bloom_mojo.csv",
+    "results/raw/full/full_quotient_filter_cpp.csv",
+    "results/raw/full/full_quotient_filter_mojo.csv",
+    "results/raw/full/full_elias_fano_cpp.csv",
+    "results/raw/full/full_elias_fano_mojo.csv",
+]
+
+[tasks.bench_full_parallel]
+cmd = "python common/run_benchmarks.py --profile full --parallel-workers 0 --reserve-cores 4 --output-dir-name full_parallel"
+inputs = [
+    "common/run_benchmarks.py",
+    "common/params.json",
+    "common/hash_reference.py",
+    "common/hash_spec.py",
+    "common/hash_spec.json",
+    "common/generate_hash_assets.py",
+    "common/analysis/collect_build_metrics.py",
+    "cpp/CMakeLists.txt",
+    "cpp/include/**/*.hpp",
+    "cpp/benches/**/*.cpp",
+    "mojo/bench_main.mojo",
+    "mojo/src/**/*.mojo",
+]
+outputs = [
+    "results/raw/full_parallel/full_blocked_bloom_cpp.csv",
+    "results/raw/full_parallel/full_blocked_bloom_mojo.csv",
+    "results/raw/full_parallel/full_quotient_filter_cpp.csv",
+    "results/raw/full_parallel/full_quotient_filter_mojo.csv",
+    "results/raw/full_parallel/full_elias_fano_cpp.csv",
+    "results/raw/full_parallel/full_elias_fano_mojo.csv",
+]
+
+[tasks._code_metrics]
+cmd = "python common/code_metrics.py"
+inputs = [
+    "common/code_metrics.py",
+    "common/compare_implementations.py",
+    "cpp/**/*.hpp",
+    "cpp/**/*.cpp",
+    "mojo/**/*.mojo",
+]
+outputs = ["results/processed/code_metrics.csv"]
+
+[tasks.compare_impls]
+cmd = "python common/compare_implementations.py"
+inputs = [
+    "common/compare_implementations.py",
+    "common/implementation_compare_spec.json",
+    "cpp/include/**/*.hpp",
+    "cpp/tools/**/*.cpp",
+    "mojo/**/*.mojo",
+]
+outputs = [
+    "results/processed/implementation_compare.html",
+    "results/processed/implementation_compare.md",
+    "results/processed/implementation_compare.json",
+]
+
+[tasks.compare_impls_check]
+cmd = "python common/compare_implementations.py --check"
+inputs = [
+    "common/compare_implementations.py",
+    "common/implementation_compare_spec.json",
+    "cpp/include/**/*.hpp",
+    "cpp/tools/**/*.cpp",
+    "mojo/**/*.mojo",
+]
+
+[tasks._summarize_smoke_results]
+cmd = "python common/analysis/summarize_results.py --profile smoke"
+inputs = ["common/analysis/summarize_results.py", "results/raw/smoke/*.csv"]
+outputs = ["results/processed/smoke_summary.csv"]
+
+[tasks._summarize_representative_results]
+cmd = "python common/analysis/summarize_results.py --profile representative"
+inputs = ["common/analysis/summarize_results.py", "results/raw/representative/*.csv"]
+outputs = ["results/processed/representative_summary.csv"]
+
+[tasks._summarize_representative_parallel_results]
+cmd = "python common/analysis/summarize_results.py --profile representative --raw-dir-name representative_parallel --output results/processed/representative_parallel_summary.csv"
+inputs = ["common/analysis/summarize_results.py", "results/raw/representative_parallel/*.csv"]
+outputs = ["results/processed/representative_parallel_summary.csv"]
+
+[tasks._summarize_report_results]
+depends-on = ["_summarize_representative_results"]
+
+[tasks._summarize_full_results]
+cmd = "python common/analysis/summarize_results.py --profile full"
+inputs = ["common/analysis/summarize_results.py", "results/raw/full/*.csv"]
+outputs = ["results/processed/full_summary.csv"]
+
+[tasks._summarize_full_parallel_results]
+cmd = "python common/analysis/summarize_results.py --profile full --raw-dir-name full_parallel --output results/processed/full_parallel_summary.csv"
+inputs = ["common/analysis/summarize_results.py", "results/raw/full_parallel/*.csv"]
+outputs = ["results/processed/full_parallel_summary.csv"]
+
+[tasks._build_metrics]
+cmd = "python common/analysis/collect_build_metrics.py"
+inputs = [
+    "common/analysis/collect_build_metrics.py",
+    "common/hash_reference.py",
+    "common/hash_spec.py",
+    "common/hash_spec.json",
+    "common/generate_hash_assets.py",
+    "cpp/CMakeLists.txt",
+    "cpp/include/**/*.hpp",
+    "cpp/benches/**/*.cpp",
+    "mojo/bench_main.mojo",
+    "mojo/src/**/*.mojo",
+]
+outputs = ["results/processed/build_metrics.csv"]
+
+[tasks.plot_results_smoke]
+cmd = "python common/plots/plot_results.py --profile smoke"
+depends-on = ["_summarize_smoke_results", "_code_metrics", "_build_metrics"]
+inputs = [
+    "common/plots/plot_results.py",
+    "results/processed/smoke_summary.csv",
+    "results/processed/code_metrics.csv",
+    "results/processed/build_metrics.csv",
+]
+outputs = [
+    "results/figures/smoke/fig01_throughput_overview.png",
+    "results/figures/smoke/fig02_bloom_scaling.png",
+    "results/figures/smoke/fig03_bloom_bpk_sweep.png",
+    "results/figures/smoke/fig04_bloom_fpr.png",
+    "results/figures/smoke/fig05_qf_workloads.png",
+    "results/figures/smoke/fig06_qf_load_sensitivity.png",
+    "results/figures/smoke/fig07_qf_heatmap.png",
+    "results/figures/smoke/fig08_ef_density.png",
+    "results/figures/smoke/fig09_ef_scaling.png",
+    "results/figures/smoke/fig10_ratio_dashboard.png",
+    "results/figures/smoke/fig11_qf_remainder_sweep.png",
+    "results/figures/smoke/fig12_metrics_dashboard.png",
+    "results/figures/smoke/fig13_memory_efficiency.png",
+]
+
+[tasks.plot_results_representative]
+cmd = "python common/plots/plot_results.py --profile representative"
+depends-on = ["_summarize_representative_results", "_code_metrics", "_build_metrics"]
+inputs = [
+    "common/plots/plot_results.py",
+    "results/processed/representative_summary.csv",
+    "results/processed/code_metrics.csv",
+    "results/processed/build_metrics.csv",
+]
+outputs = [
+    "results/figures/representative/fig01_throughput_overview.png",
+    "results/figures/representative/fig02_bloom_scaling.png",
+    "results/figures/representative/fig03_bloom_bpk_sweep.png",
+    "results/figures/representative/fig04_bloom_fpr.png",
+    "results/figures/representative/fig05_qf_workloads.png",
+    "results/figures/representative/fig06_qf_load_sensitivity.png",
+    "results/figures/representative/fig07_qf_heatmap.png",
+    "results/figures/representative/fig08_ef_density.png",
+    "results/figures/representative/fig09_ef_scaling.png",
+    "results/figures/representative/fig10_ratio_dashboard.png",
+    "results/figures/representative/fig11_qf_remainder_sweep.png",
+    "results/figures/representative/fig12_metrics_dashboard.png",
+    "results/figures/representative/fig13_memory_efficiency.png",
+]
+
+[tasks.plot_results_representative_parallel]
+cmd = "python common/plots/plot_results.py --profile representative --summary results/processed/representative_parallel_summary.csv --output-dir-name representative_parallel"
+depends-on = ["_summarize_representative_parallel_results", "_code_metrics", "_build_metrics"]
+inputs = [
+    "common/plots/plot_results.py",
+    "results/processed/representative_parallel_summary.csv",
+    "results/processed/code_metrics.csv",
+    "results/processed/build_metrics.csv",
+]
+outputs = [
+    "results/figures/representative_parallel/fig01_throughput_overview.png",
+    "results/figures/representative_parallel/fig02_bloom_scaling.png",
+    "results/figures/representative_parallel/fig03_bloom_bpk_sweep.png",
+    "results/figures/representative_parallel/fig04_bloom_fpr.png",
+    "results/figures/representative_parallel/fig05_qf_workloads.png",
+    "results/figures/representative_parallel/fig06_qf_load_sensitivity.png",
+    "results/figures/representative_parallel/fig07_qf_heatmap.png",
+    "results/figures/representative_parallel/fig08_ef_density.png",
+    "results/figures/representative_parallel/fig09_ef_scaling.png",
+    "results/figures/representative_parallel/fig10_ratio_dashboard.png",
+    "results/figures/representative_parallel/fig11_qf_remainder_sweep.png",
+    "results/figures/representative_parallel/fig12_metrics_dashboard.png",
+    "results/figures/representative_parallel/fig13_memory_efficiency.png",
+]
+
+[tasks.plot_results]
+cmd = "python common/plots/plot_results.py --profile full"
+depends-on = ["_summarize_full_results", "_code_metrics", "_build_metrics"]
+inputs = [
+    "common/plots/plot_results.py",
+    "results/processed/full_summary.csv",
+    "results/processed/code_metrics.csv",
+    "results/processed/build_metrics.csv",
+]
+outputs = [
+    "results/figures/full/fig01_throughput_overview.png",
+    "results/figures/full/fig02_bloom_scaling.png",
+    "results/figures/full/fig03_bloom_bpk_sweep.png",
+    "results/figures/full/fig04_bloom_fpr.png",
+    "results/figures/full/fig05_qf_workloads.png",
+    "results/figures/full/fig06_qf_load_sensitivity.png",
+    "results/figures/full/fig07_qf_heatmap.png",
+    "results/figures/full/fig08_ef_density.png",
+    "results/figures/full/fig09_ef_scaling.png",
+    "results/figures/full/fig10_ratio_dashboard.png",
+    "results/figures/full/fig11_qf_remainder_sweep.png",
+    "results/figures/full/fig12_metrics_dashboard.png",
+    "results/figures/full/fig13_memory_efficiency.png",
+]
+
+[tasks.plot_results_full_parallel]
+cmd = "python common/plots/plot_results.py --profile full --summary results/processed/full_parallel_summary.csv --output-dir-name full_parallel"
+depends-on = ["_summarize_full_parallel_results", "_code_metrics", "_build_metrics"]
+inputs = [
+    "common/plots/plot_results.py",
+    "results/processed/full_parallel_summary.csv",
+    "results/processed/code_metrics.csv",
+    "results/processed/build_metrics.csv",
+]
+outputs = [
+    "results/figures/full_parallel/fig01_throughput_overview.png",
+    "results/figures/full_parallel/fig02_bloom_scaling.png",
+    "results/figures/full_parallel/fig03_bloom_bpk_sweep.png",
+    "results/figures/full_parallel/fig04_bloom_fpr.png",
+    "results/figures/full_parallel/fig05_qf_workloads.png",
+    "results/figures/full_parallel/fig06_qf_load_sensitivity.png",
+    "results/figures/full_parallel/fig07_qf_heatmap.png",
+    "results/figures/full_parallel/fig08_ef_density.png",
+    "results/figures/full_parallel/fig09_ef_scaling.png",
+    "results/figures/full_parallel/fig10_ratio_dashboard.png",
+    "results/figures/full_parallel/fig11_qf_remainder_sweep.png",
+    "results/figures/full_parallel/fig12_metrics_dashboard.png",
+    "results/figures/full_parallel/fig13_memory_efficiency.png",
+]
+
+[tasks.plot_results_full]
+depends-on = ["plot_results"]
+
+[tasks.bench_representative_and_plot]
+depends-on = ["bench_representative", "plot_results_representative"]
+
+[tasks.bench_representative_parallel_and_plot]
+depends-on = ["bench_representative_parallel", "plot_results_representative_parallel"]
+
+[tasks.bench_report_and_plot]
+depends-on = ["bench_representative_and_plot"]
+
+[tasks.bench_full_and_plot]
+depends-on = ["bench_full", "plot_results"]
+
+[tasks.bench_full_parallel_and_plot]
+depends-on = ["bench_full_parallel", "plot_results_full_parallel"]
+
+[tasks.clean]
+cmd = "rm -rf build"
+
+[tasks.reset]
+cmd = "rm -rf build results"
+
+[dependencies]
+mojo = ">=0.26.3.0.dev2026031705,<0.27"
+python = ">=3.14.3,<3.15"
+matplotlib = ">=3.10.8,<4"

@@ -1,0 +1,65 @@
+docs/
+report/
+Slides/
+results/
+
+# Build artifacts
+build/
+dist/
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.exe
+
+# CMake files
+cpp/build/
+cpp/CMakeFiles/
+cpp/CMakeCache.txt
+cpp/Makefile
+cpp/cmake_install.cmake
+cpp/*.cmake
+
+# Python/Matplotlib cache
+__pycache__/
+*.pyc
+
+# Mojo compilation outputs
+*.mojoc
+*.mojo.o
+
+# Results and generated plots
+results/
+*.png
+*.pdf
+
+# Logs and reports
+*.log
+report/*.aux
+report/*.out
+report/*.toc
+report/*.lof
+report/*.lot
+report/*.gz
+report/*.bbl
+report/*.blg
+report/*.synctex.gz
+
+# VSCode/editor
+.vscode/*
+!.vscode/settings.json
+*.code-workspace
+
+# Local TeX cache for LuaLaTeX in VS Code
+.texlive-cache/
+
+# Environment/lock files (if user wishes)
+.pixi/
+pixi.lock
+# Uncomment if you want to ignore Pixi environment files
+# pixi.toml
+
+# OS files
+.DS_Store
+Thumbs.db

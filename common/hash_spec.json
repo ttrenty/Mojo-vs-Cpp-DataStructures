@@ -1,0 +1,45 @@
+{
+  "splitmix64": {
+    "increment": "0x9E3779B97F4A7C15",
+    "mul1": "0xBF58476D1CE4E5B9",
+    "mul2": "0x94D049BB133111EB"
+  },
+  "domain_seeds": {
+    "bloom_block_seed": "0x243F6A8885A308D3",
+    "bloom_step_seed": "0x13198A2E03707344",
+    "bloom_index_seed": "0x452821E638D01377",
+    "dataset_key_seed": "0xA4093822299F31D0",
+    "dataset_negative_seed": "0x082EFA98EC4E6C89"
+  },
+  "recommended_k_hashes": {
+    "minimum": 1,
+    "numerator": 693,
+    "rounding": 500,
+    "denominator": 1000
+  },
+  "bit_layout": {
+    "word_bits": 64,
+    "word_shift": 6,
+    "word_mask": 63,
+    "high_bit_mask": "0x8000000000000000"
+  },
+  "blocked_bloom": {
+    "block_bits": 512,
+    "words_per_block": 8
+  },
+  "quotient_filter": {
+    "initial_cluster_reserve": 8
+  },
+  "benchmark_labels": {
+    "dense_universe_factor_max": 16,
+    "medium_universe_factor_max": 256
+  },
+  "golden_cases": {
+    "count": 100,
+    "key_multiplier": "0x9E3779B97F4A7C15",
+    "key_seed": "0xDEADBEEFCAFEBABE",
+    "seed_multiplier": "0xD1B54A32D192ED03",
+    "seed_seed": "0x1234567890ABCDEF",
+    "signed_int_max": "0x7FFFFFFFFFFFFFFF"
+  }
+}
