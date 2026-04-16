@@ -45,6 +45,125 @@ NORMALIZE_IGNORE = {
     "implicitlycopyable",
     "return",
 }
+CPP_KEYWORDS = {
+    "auto",
+    "break",
+    "case",
+    "catch",
+    "class",
+    "const",
+    "constexpr",
+    "continue",
+    "default",
+    "delete",
+    "else",
+    "false",
+    "for",
+    "if",
+    "inline",
+    "namespace",
+    "new",
+    "noexcept",
+    "nullptr",
+    "override",
+    "private",
+    "protected",
+    "public",
+    "return",
+    "static",
+    "struct",
+    "switch",
+    "template",
+    "this",
+    "throw",
+    "true",
+    "try",
+    "typename",
+    "using",
+    "virtual",
+    "while",
+}
+CPP_TYPES = {
+    "bool",
+    "double",
+    "float",
+    "int",
+    "size_t",
+    "std::optional",
+    "std::size_t",
+    "std::span",
+    "std::string",
+    "std::string_view",
+    "std::uint32_t",
+    "std::uint64_t",
+    "std::vector",
+    "uint32_t",
+    "uint64_t",
+    "void",
+}
+MOJO_KEYWORDS = {
+    "alias",
+    "and",
+    "def",
+    "else",
+    "False",
+    "for",
+    "from",
+    "if",
+    "import",
+    "in",
+    "let",
+    "mut",
+    "None",
+    "not",
+    "or",
+    "out",
+    "raises",
+    "read",
+    "ref",
+    "return",
+    "staticmethod",
+    "struct",
+    "True",
+    "var",
+    "while",
+}
+MOJO_TYPES = {
+    "Bool",
+    "Copyable",
+    "Error",
+    "Float64",
+    "ImplicitlyCopyable",
+    "ImmutOrigin",
+    "Int",
+    "List",
+    "Movable",
+    "Optional",
+    "Span",
+    "StaticConstantOrigin",
+    "StaticString",
+    "String",
+    "TrivialRegisterPassable",
+    "UInt32",
+    "UInt64",
+}
+CPP_HIGHLIGHT_RE = re.compile(
+    r"/\*[\s\S]*?\*/|//[^\n]*|"
+    r'"(?:\\.|[^"\\])*"|'
+    r"'(?:\\.|[^'\\])*'|"
+    r"\[\[[^\]]+\]\]|"
+    r"\b(?:0x[0-9A-Fa-f]+|\d+(?:\.\d+)?)\b|"
+    r"[A-Za-z_~][A-Za-z0-9_:]*"
+)
+MOJO_HIGHLIGHT_RE = re.compile(
+    r"#.*|"
+    r'"""[\s\S]*?"""|'
+    r'"(?:\\.|[^"\\])*"|'
+    r"'(?:\\.|[^'\\])*'|"
+    r"@[A-Za-z_][A-Za-z0-9_]*|"
+    r"\b(?:0x[0-9A-Fa-f]+|\d+(?:\.\d+)?)\b|"
+    r"[A-Za-z_][A-Za-z0-9_]*"
+)
 
 
 @dataclass
@@ -128,7 +247,9 @@ def parse_cpp_symbols(path: Path) -> tuple[dict[str, SymbolBlock], dict[str, Sym
     function_blocks: dict[str, SymbolBlock] = {}
     type_blocks: dict[str, SymbolBlock] = {}
 
-    type_pattern = re.compile(r"^\s*(?:class|struct)\s+([A-Za-z_][A-Za-z0-9_]*)\b")
+    type_pattern = re.compile(
+        r"^\s*(?:class|struct)\s+(?:alignas\([^)]*\)\s+)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
     function_pattern = re.compile(
         r"^\s*(?:template\s*<[^>]+>\s*)?"
         r"(?:\[\[nodiscard\]\]\s+)?"
@@ -195,19 +316,20 @@ def parse_mojo_symbols(path: Path) -> tuple[dict[str, SymbolBlock], dict[str, Sy
     type_blocks: dict[str, SymbolBlock] = {}
 
     type_pattern = re.compile(r"^\s*struct\s+([A-Za-z_][A-Za-z0-9_]*)\b")
-    function_pattern = re.compile(r"^\s*def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
-
     for index, line in enumerate(lines):
         type_match = type_pattern.match(line)
         if type_match:
             name = type_match.group(1)
             if name not in type_blocks:
-                block = extract_mojo_block(lines, index, include_decorators=False)
+                block = extract_mojo_block(lines, index, include_decorators=True)
                 block.name = name
                 block.kind = "type"
                 type_blocks[name] = block
 
-        function_match = function_pattern.match(line)
+        function_match = re.match(
+            r"^\s*def\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[.*\])?\s*\(",
+            line,
+        )
         if function_match:
             name = function_match.group(1)
             if name not in function_blocks:
@@ -397,6 +519,75 @@ def badge_class(status: str) -> str:
     }[status]
 
 
+def wrap_token(token: str, css_class: str) -> str:
+    return f"<span class='{css_class}'>{html.escape(token)}</span>"
+
+
+def token_class_for_identifier(token: str, language: str, source_text: str, token_end: int) -> str | None:
+    keyword_set = CPP_KEYWORDS if language == "cpp" else MOJO_KEYWORDS
+    type_set = CPP_TYPES if language == "cpp" else MOJO_TYPES
+    if token in keyword_set:
+        return "tok-keyword"
+    if token in type_set:
+        return "tok-type"
+    if re.fullmatch(r"[A-Z][A-Z0-9_]*", token):
+        return "tok-constant"
+    if re.fullmatch(r"(?:[A-Z][A-Za-z0-9]*)+(?:::(?:[A-Z][A-Za-z0-9]*)+)*", token):
+        return "tok-type"
+
+    for char in source_text[token_end:]:
+        if char.isspace():
+            continue
+        if char == "(":
+            return "tok-call"
+        break
+    return None
+
+
+def highlight_code(text: str, language: str) -> str:
+    if language == "normalized":
+        return html.escape(text)
+
+    pattern = CPP_HIGHLIGHT_RE if language == "cpp" else MOJO_HIGHLIGHT_RE
+    parts: list[str] = []
+    cursor = 0
+    for match in pattern.finditer(text):
+        start, end = match.span()
+        if start > cursor:
+            parts.append(html.escape(text[cursor:start]))
+        token = match.group(0)
+
+        css_class: str | None = None
+        if language == "cpp" and (token.startswith("//") or token.startswith("/*")):
+            css_class = "tok-comment"
+        elif language == "mojo" and token.startswith("#"):
+            css_class = "tok-comment"
+        elif token.startswith(('"', "'", '"""')):
+            css_class = "tok-string"
+        elif token.startswith("[[") or token.startswith("@"):
+            css_class = "tok-decorator"
+        elif re.fullmatch(r"(?:0x[0-9A-Fa-f]+|\d+(?:\.\d+)?)", token):
+            css_class = "tok-number"
+        else:
+            css_class = token_class_for_identifier(token, language, text, end)
+
+        if css_class is None:
+            parts.append(html.escape(token))
+        else:
+            parts.append(wrap_token(token, css_class))
+        cursor = end
+
+    if cursor < len(text):
+        parts.append(html.escape(text[cursor:]))
+    return "".join(parts)
+
+
+def render_code_block(text: str, language: str) -> str:
+    return (
+        f"<pre class='code-block {language}'><code>{highlight_code(text, language)}</code></pre>"
+    )
+
+
 def render_html(summary: list[dict[str, object]]) -> str:
     filter_options: list[str] = ["<option value='all'>All file pairs</option>"]
     for module in summary:
@@ -443,8 +634,25 @@ def render_html(summary: list[dict[str, object]]) -> str:
         ".meta{color:#52606d;font-size:14px;margin-bottom:10px;}",
         ".grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}",
         ".panel{background:#fbfdff;border:1px solid #d9e2ec;border-radius:10px;padding:12px;}",
+        ".panel.cpp-panel{border-top:3px solid #3b82f6;}",
+        ".panel.mojo-panel{border-top:3px solid #f97316;}",
+        ".panel.normalized-panel{border-top:3px solid #64748b;}",
         ".panel h4{margin:0 0 8px 0;font-size:14px;}",
         "pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;}",
+        ".code-block{padding:14px 16px;border-radius:10px;overflow:auto;tab-size:4;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);}",
+        ".code-block code{font-family:inherit;}",
+        ".code-block.cpp{background:linear-gradient(180deg,#0f172a 0%,#132238 100%);color:#e5eef9;}",
+        ".code-block.mojo{background:linear-gradient(180deg,#1f1720 0%,#2a1d22 100%);color:#fff1e6;}",
+        ".code-block.normalized{background:linear-gradient(180deg,#111827 0%,#1f2937 100%);color:#e5e7eb;}",
+        ".tok-comment{color:#94a3b8;font-style:italic;}",
+        ".cpp .tok-keyword,.code-block.cpp .tok-keyword{color:#93c5fd;font-weight:700;}",
+        ".mojo .tok-keyword,.code-block.mojo .tok-keyword{color:#fdba74;font-weight:700;}",
+        ".tok-type{color:#86efac;font-weight:600;}",
+        ".tok-call{color:#f9a8d4;}",
+        ".tok-number{color:#fcd34d;}",
+        ".tok-string{color:#c4f1be;}",
+        ".tok-decorator{color:#67e8f9;font-weight:600;}",
+        ".tok-constant{color:#d8b4fe;font-weight:600;}",
         "ul{margin:8px 0 0 20px;}",
         "details{margin-top:10px;}",
         "code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}",
@@ -569,7 +777,7 @@ def render_html(summary: list[dict[str, object]]) -> str:
                     f"<div class='meta'>Normalized similarity: {pair['similarity']:.3f}</div>"
                 )
             rows.append("<div class='grid'>")
-            rows.append("<div class='panel'>")
+            rows.append("<div class='panel cpp-panel'>")
             rows.append("<h4>C++</h4>")
             if cpp_block is None:
                 rows.append("<div class='meta'>Missing</div>")
@@ -577,9 +785,9 @@ def render_html(summary: list[dict[str, object]]) -> str:
                 rows.append(
                     f"<div class='meta'><code>{html.escape(str(module['cpp_path']))}:{cpp_block.start_line}-{cpp_block.end_line}</code></div>"
                 )
-                rows.append(f"<pre>{html.escape(cpp_block.text)}</pre>")
+                rows.append(render_code_block(cpp_block.text, "cpp"))
             rows.append("</div>")
-            rows.append("<div class='panel'>")
+            rows.append("<div class='panel mojo-panel'>")
             rows.append("<h4>Mojo</h4>")
             if mojo_block is None:
                 rows.append("<div class='meta'>Missing</div>")
@@ -587,16 +795,18 @@ def render_html(summary: list[dict[str, object]]) -> str:
                 rows.append(
                     f"<div class='meta'><code>{html.escape(str(module['mojo_path']))}:{mojo_block.start_line}-{mojo_block.end_line}</code></div>"
                 )
-                rows.append(f"<pre>{html.escape(mojo_block.text)}</pre>")
+                rows.append(render_code_block(mojo_block.text, "mojo"))
             rows.append("</div></div>")
 
             if pair["cpp_block"] is not None and pair["mojo_block"] is not None:
                 rows.append("<details><summary>Normalized logic view</summary>")
                 rows.append("<div class='grid'>")
-                rows.append("<div class='panel'><h4>C++ normalized</h4>")
-                rows.append(f"<pre>{html.escape(pair['cpp_normalized'])}</pre></div>")
-                rows.append("<div class='panel'><h4>Mojo normalized</h4>")
-                rows.append(f"<pre>{html.escape(pair['mojo_normalized'])}</pre></div>")
+                rows.append("<div class='panel normalized-panel'><h4>C++ normalized</h4>")
+                rows.append(render_code_block(str(pair["cpp_normalized"]), "normalized"))
+                rows.append("</div>")
+                rows.append("<div class='panel normalized-panel'><h4>Mojo normalized</h4>")
+                rows.append(render_code_block(str(pair["mojo_normalized"]), "normalized"))
+                rows.append("</div>")
                 rows.append("</div></details>")
             rows.append("</div>")
 
