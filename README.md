@@ -18,6 +18,7 @@ Side-by-side HTML comparison of Mojo and C++ code: [https://ttrenty.github.io/Mo
 common/   shared scripts, benchmark params, plotting, compare tool, hash spec
 cpp/      C++ implementation, tests, benchmarks, and small helper CLIs
 mojo/     Mojo implementation, tests, benchmarks, and small helper CLIs
+docs/     stable figures and notes kept in the repository
 results/  raw results, processed summaries, generated figures, compare artifacts
 ```
 
@@ -39,6 +40,44 @@ If you need a different C++ compiler:
 CXX=g++ pixi run _build_cpp
 ```
 
+## Hardware and Benchmark Setup
+
+The benchmark results were collected on:
+
+- Intel Core i7-14700K
+- Clang 15.0.7 for C++
+- Mojo 0.26.3
+
+Benchmark processes are pinned to a single CPU core when possible, and the current report configuration uses:
+
+- `10` untimed warmup runs
+- `30` timed runs
+- median throughput with an interquartile range
+
+Parallel benchmark tasks are available too, but they write to separate output
+directories so they do not overwrite the single-core baseline.
+
+## Example Figures
+
+These are stable copies of a few full-result figures stored in `docs/figures/`
+for the repository page.
+
+### Throughput Overview
+
+![Throughput overview](docs/figures/fig01_throughput_overview.png)
+
+### Quotient Filter Load Sensitivity
+
+![Quotient Filter load sensitivity](docs/figures/fig06_qf_load_sensitivity.png)
+
+### Ratio Dashboard
+
+![Ratio dashboard](docs/figures/fig10_ratio_dashboard.png)
+
+### Code and Build Metrics
+
+![Metrics dashboard](docs/figures/fig12_metrics_dashboard.png)
+
 ## Most Useful Commands
 
 - `pixi run tests`
@@ -50,19 +89,19 @@ CXX=g++ pixi run _build_cpp
 - `pixi run compare_impls_check`
   - fail if the comparison contract detects drift
 - `pixi run bench_full`
-  - run the main benchmark set used for the report
+  - run the main benchmark
 - `pixi run bench_full_parallel`
   - same benchmark set, but spread across most CPU cores while leaving a few free
 - `pixi run plot_results`
-  - summarize the full results and regenerate the report-facing figures
+  - summarize the full results and regenerate the figures
 - `pixi run plot_results_full_parallel`
   - summarize and plot the parallel full run separately
 
 You can pass extra benchmark arguments through Pixi with `--`:
 
 ```bash
-pixi run bench_full -- --runs-override 15 --warmup-runs-override 5
-pixi run bench_full_parallel -- --reserve-cores 3 --runs-override 15
+pixi run bench_full -- --runs-override 30 --warmup-runs-override 10
+pixi run bench_full_parallel -- --reserve-cores 3 --runs-override 30 --warmup-runs-override 10
 ```
 
 ## Results Layout
